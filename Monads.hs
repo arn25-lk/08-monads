@@ -29,7 +29,9 @@ in the tree.
 
 -- | zip two trees together
 zipTree :: Tree a -> Tree b -> Tree (a, b)
-zipTree = undefined
+zipTree (Leaf a) (Leaf b) = Leaf (a,b) 
+zipTree (Branch l1 r1)  (Branch l2 r2) = Branch (zipTree l1 l2) (zipTree r1 r2)
+zipTree _               _              = error "wrong pattern"
 
 {-
         o                     o                      o
@@ -65,7 +67,9 @@ Let's rewrite it so that the partiality is explicit in the type.
 -}
 
 zipTree1 :: Tree a -> Tree b -> Maybe (Tree (a, b))
-zipTree1 = undefined
+zipTree1 (Leaf a) (Leaf b) = Just (Leaf (a,b))
+zipTree1 (Branch l1 r1) (Branch l2 r2) = Just (Branch (zipTree l1 l2) (zipTree r1 r2))
+zipTree1 _    _ = Nothing
 
 {-
 This function is going to be our inspiration for the following development.
@@ -324,9 +328,9 @@ So we can rewrite the example to use the monadic functions!
 zipTree4 :: Tree a -> Tree b -> Maybe (Tree (a, b))
 zipTree4 (Leaf a) (Leaf b) = return (Leaf (a, b))
 zipTree4 (Branch l r) (Branch l' r') =
-  zipTree3 l l'
+  zipTree4 l l'
     >>= ( \x ->
-            zipTree3 r r'
+            zipTree4 r r'
               >>= ( \y ->
                       return (Branch x y)
                   )
@@ -380,7 +384,9 @@ zipTree function using the above `do` notation for the `>>=` operator.
 zipTree5 :: Tree a -> Tree b -> Maybe (Tree (a, b))
 zipTree5 (Leaf a) (Leaf b) = return (Leaf (a, b))
 zipTree5 (Branch l r) (Branch l' r') = do
-  undefined
+        x <- zipTree5 l l' 
+        y <- zipTree5 r r'
+        return (Branch x y)
 zipTree5 _ _ = Nothing
 
 -- >>> testZip zipTree5
@@ -534,13 +540,17 @@ right. )
 -}
 
 fmapMonad :: (Monad m) => (a -> b) -> m a -> m b
-fmapMonad = undefined
+fmapMonad f x =  x >>= (\l -> return (f l))
 
 pureMonad :: (Monad m) => a -> m a
-pureMonad = undefined
+pureMonad = return
 
 zapMonad :: (Monad m) => m (a -> b) -> m a -> m b
-zapMonad = undefined
+--zapMonad mf ma = mf >>= (\ f -> ma >>= (\ a -> return (f a) ) )
+zapMonad mf ma = do 
+                  f <- mf
+                  a <- ma
+                  return (f a) 
 
 {-
 Note that `fmapMonad` is called `liftM` and `zapMonad` is called `ap` in the
@@ -582,8 +592,8 @@ should *not* be recursive.
 -- >>> pairs0 [1,2,3] [5,6,7]
 -- [(1,5),(1,6),(1,7),(2,5),(2,6),(2,7),(3,5),(3,6),(3,7)]
 pairs0 :: [a] -> [b] -> [(a, b)]
-pairs0 xs ys = undefined
-
+pairs0 xs ys = concat $ map (\x -> map (\ y -> (x,y)) ys) xs
+ 
 testPairs :: ([Int] -> [Int] -> [(Int, Int)]) -> Bool
 testPairs ps =
   ps [1, 2, 3, 4] [5, 6, 7, 8]
@@ -708,7 +718,7 @@ Rewrite `pairs` using `>>=` and return
 -- >>> pairs2 [1,2,3] [5,6,7]
 -- [(1,5),(1,6),(1,7),(2,5),(2,6),(2,7),(3,5),(3,6),(3,7)]
 pairs2 :: [a] -> [b] -> [(a, b)]
-pairs2 xs ys = undefined
+pairs2 xs ys = xs >>= (\ x -> ys >>= (\ y -> [(x,y)]))
 
 {-
 Rewrite again using do notation
@@ -717,7 +727,10 @@ Rewrite again using do notation
 -- >>> pairs3 [1,2,3] [5,6,7]
 -- [(1,5),(1,6),(1,7),(2,5),(2,6),(2,7),(3,5),(3,6),(3,7)]
 pairs3 :: [a] -> [b] -> [(a, b)]
-pairs3 xs ys = undefined
+pairs3 xs ys = do 
+      x <- xs
+      y <- ys
+      [(x,y)]
 
 {-
 Make sure that it still works.
@@ -847,7 +860,7 @@ Other examples
 
 -- >>> map' (+1) [1,2,3]
 map' :: (a -> b) -> [a] -> [b]
-map' f xs = undefined
+map' f xs = [ f x | x <- xs]
 
 {-
 * Create a list of all pairs where the first component is from the first list,
@@ -857,25 +870,38 @@ map' f xs = undefined
 
 -- >>> firstLess [1,2,3] [1,2,3]
 firstLess :: Ord a => [a] -> [a] -> [(a, a)]
-firstLess = undefined
+firstLess xs ys = [(x,y) | x <- xs, y <- ys, x < y]
 
 {-
 Now rewrite `map'` and `firstLess` using do notation (don't forget `guard` above)
 -}
 
 map1 :: (a -> b) -> [a] -> [b]
-map1 = undefined
+map1 f xs = do
+  x <- xs 
+  return $ f x
+
 
 firstLess1 :: Ord a => [a] -> [a] -> [(a, a)]
-firstLess1 xs ys = undefined
+firstLess1 xs ys = do
+                    x <- xs
+                    y <- ys
+                    guard (x < y)
+                    return (x,y)
 
 {-
 * Rewrite `filter`, using a guarded list comprehension.
 -}
 
 filter' :: (a -> Bool) -> [a] -> [a]
-filter' f xs = undefined
+filter' f xs = do 
+                  x <- xs
+                  guard (f x)
+                  return x
 
+
+filter'' :: (a -> Bool) -> [a] -> [a]
+filter'' f xs = xs >>= (\x -> guard (f x) >> return x) -- >> when not using the return value of the first monad argument. 
 {-
 The List Applicative
 ====================
@@ -899,10 +925,15 @@ at the definition above to see what could makes sense.
 
 -- >>> pairs6 [1,2,3] [1,2,3]
 pairs6 :: [a] -> [b] -> [(a, b)]
-pairs6 xs ys = undefined
-
+pairs6 xs ys = pure (,) <*> xs <*> ys
+-- (,) == (\x y -> (x, y))
 {-
 Once you get `pairs6`, try inlining the definitions of `pure` and `<*>` to see
 how they relate.
 
+do 
+  x <- ma
+  mb
+_________________
+ma >>= (\x -> mb)
 -}
