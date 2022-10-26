@@ -1,6 +1,7 @@
 {-
 ---
 fulltitle: "In class exercise: Practice with Maybe Monad"
+date: October 26, 2022
 ---
 
 The goal of this short in-class exercise is to get a bit more practice with using the `Maybe` Monad.
@@ -46,7 +47,14 @@ according to the examples below.
 -- Nothing
 
 parseWeather :: Map String String -> Maybe Weather
-parseWeather = undefined
+parseWeather ma = do 
+     x <- Map.lookup "day" ma
+     y <- Map.lookup "maxTemp" ma
+     z <- Map.lookup "minTemp" ma
+     a <- Text.readMaybe x :: Maybe Int
+     b <- Text.readMaybe y :: Maybe Int
+     c <- Text.readMaybe z :: Maybe Int
+     return (Weather {dayNumber=a, maxTemp=b, minTemp=c})
 
 {-
 Part 2
@@ -68,7 +76,10 @@ One can be defined using `(>>=)` from the `Maybe` monad, and one cannot. Which i
 -- >>> firstJust Nothing Nothing
 -- Nothing
 firstJust :: Maybe a -> Maybe a -> Maybe a
-firstJust = undefined
+firstJust (Just x) (Just y) = Just x 
+firstJust Nothing (Just y) = Just y
+firstJust (Just x) Nothing = Just x 
+firstJust Nothing Nothing = Nothing
 
 -- | Ensure that both Maybes are 'Just' and retain the first one
 --
@@ -81,4 +92,4 @@ firstJust = undefined
 -- >>> sequenceFirst Nothing Nothing
 -- Nothing
 sequenceFirst :: Maybe a -> Maybe b -> Maybe a
-sequenceFirst = undefined
+sequenceFirst x y = x >>= (\a -> y >>= (\b -> Just a))

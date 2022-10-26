@@ -1,6 +1,7 @@
 {-
 ---
 fulltitle: "In class exercise: General Monadic Functions"
+date: October 26, 2022
 ---
 -}
 
@@ -78,28 +79,35 @@ the mapped function can return its value in some monad m.
 -- (b)
 
 foldM :: Monad m => (a -> b -> m a) -> a -> [b] -> m a
-foldM = error "foldM: unimplemented"
+foldM _  a [] = return a
+foldM f ac (l:ls) = (f ac l) >>= (\a -> foldM f a ls)
 
 -- (c)
 
 sequence :: Monad m => [m a] -> m [a]
-sequence = error "sequence: unimplemented"
+sequence [] = return []
+--sequence (m:ms) = m >>= (\x -> sequence ms >>= (\y -> return (x:y)))
+sequence (m:ms) = do 
+                x <- m
+                y <- sequence ms
+                return (x:y)
+
 
 -- (d) This one is the Kleisli "fish operator"
 --
 
 (>=>) :: Monad m => (a -> m b) -> (b -> m c) -> a -> m c
-(>=>) = error ">=>: unimplemented"
+(>=>) famb fbmc a = (famb a) >>= (\b -> fbmc b)
 
 -- (e)
 
 join :: (Monad m) => m (m a) -> m a
-join = error "join: unimplemented"
+join m = m >>= id
 
 -- (f) Define the 'liftM' function
 
 liftM :: (Monad m) => (a -> b) -> m a -> m b
-liftM = error "liftM: unimplemented"
+liftM f m = m >>= (\x -> return (f x))
 
 -- Thought question: Is the type of `liftM` similar to that of another
 -- function we've discussed recently?
@@ -107,7 +115,10 @@ liftM = error "liftM: unimplemented"
 -- (g) And its two-argument version ...
 
 liftM2 :: (Monad m) => (a -> b -> r) -> m a -> m b -> m r
-liftM2 = error "liftM2: unimplemented"
+liftM2 f ma mb = do 
+     x <- ma
+     y <- mb
+     return (f x y)
 
 {-
 -------------------------------------------------------------------------
@@ -128,11 +139,23 @@ has the same behavior on `List` and `Maybe` as the monadic versions above.
 -- NOTE: you will not be able to define all of these, but be sure to test the
 -- ones that you do
 
+--class (Functor f) => Applicative f where
+--    pure :: a -> f a
+--    (<*>) :: f (a -> b) -> f a -> f b
+--fmap :: (a -> b) -> f a -> f b
+
+apzip :: Applicative f => f a -> f b -> f (a,b)
+apzip xs ys = pure (,) <*> xs <*> ys
+
+
 mapA :: Applicative f => (a -> f b) -> [a] -> f [b]
-mapA = undefined
+mapA fun [] = pure []
+mapA fun (l:ls) =  fmap (\ (a,b) -> a : b) (apzip (fun l) (mapA fun ls)) 
+
+
 
 foldA :: Applicative f => (a -> b -> f a) -> a -> [b] -> f a
-foldA = undefined
+foldA fun acc (l:ls) = undefined 
 
 sequenceA :: Applicative f => [f a] -> f [a]
 sequenceA = undefined

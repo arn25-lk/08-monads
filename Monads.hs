@@ -1,6 +1,7 @@
 {-
 ---
 fulltitle: The Maybe and List Monads
+date: October 24, 2022
 ---
 -}
 
